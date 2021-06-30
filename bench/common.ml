@@ -28,18 +28,26 @@ let with_timer f =
   let duration = Mtime_clock.count started in
   (a, duration)
 
-let with_progress_bar ~sampling_interval ~message ~n ~unit =
-  let bar =
-    let w =
-      if n = 0 then 1
-      else float_of_int n |> log10 |> floor |> int_of_float |> succ
-    in
-    let pp fmt i = Format.fprintf fmt "%*Ld/%*d %s" w i w n unit in
-    let pp f = f ~width:(w + 1 + w + 1 + String.length unit) pp in
-    Progress_unix.counter ~sampling_interval ~mode:`ASCII ~width:79
-      ~total:(Int64.of_int n) ~message ~pp ()
+let with_progress_bar ~message ~n ~unit =
+  let open Progress in
+  let w =
+    if n = 0 then 1
+    else float_of_int n |> log10 |> floor |> int_of_float |> succ
   in
-  Progress_unix.with_reporters bar
+  let w_pp = Printer.int ~width:w in
+  let bar =
+    Line.(
+      list
+        [
+          const message;
+          count_to ~pp:w_pp n;
+          const unit;
+          elapsed ();
+          bar ~style:`ASCII n;
+          eta n |> brackets;
+        ])
+  in
+  Progress.with_reporter bar
 
 module FSHelper = struct
   let file f =

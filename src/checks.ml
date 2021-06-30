@@ -28,7 +28,11 @@ module Make (K : Data.Key) (V : Data.Value) (Platform : Platform_args) = struct
   type size = Bytes of int64 [@@deriving repr]
 
   let size_t =
-    let pp = Fmt.using (fun (Bytes b) -> b) Progress.Units.Bytes.pp in
+    let pp =
+      Fmt.using
+        (fun (Bytes b) -> b)
+        Progress.(Units.Bytes.of_int64 |> Printer.to_pp)
+    in
     Repr.like
       ~json:
         ( (fun e t ->
@@ -136,11 +140,12 @@ module Make (K : Data.Key) (V : Data.Value) (Platform : Platform_args) = struct
             let first_entry = IO.read_entry io Int63.zero in
             let previous = ref first_entry in
             Format.eprintf "\n%!";
-            Progress_unix.(
-              counter ~total:(Int63.to_int64 io_offset) ~mode:`UTF8
-                ~message:"Scanning store for faults" ~pp:Progress.Units.bytes
-                ~sampling_interval:100_000 ()
-              |> with_reporters)
+            Progress.(
+              let bar =
+                counter ~message:"Scanning store for faults"
+                  ~pp:Progress.Units.Bytes.of_int64 (Int63.to_int64 io_offset)
+              in
+              with_reporter bar)
             @@ fun report ->
             io
             |> IO.iter ~min:encoded_sizeL (fun off e ->
